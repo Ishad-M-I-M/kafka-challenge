@@ -1,0 +1,10 @@
+
+à
+java:S1598"—This file "Main.java" should be located in "org/example" directory, not in "/home/ishad/Code/kafka/kafka-challenge/src/main/java/org/example/consumer".(ŠË˜‰ÿÿÿÿÿ8·ÔÄ½…2J$6acf42cc-3fbe-4504-8bb7-efb552e8c136
+‚
+java:S6213!":Rename this variable to not match a restricted identifier.(¬ï„¢ýÿÿÿÿ8ÛÉË½…2J$6c16643d-a7af-448c-9dc2-baba3795365b
+r	java:S106'"+Replace this use of System.out by a logger.(ËÌ®çúÿÿÿÿ8úæÉ½…2J$cfb490a5-7732-4c41-b3c3-7e63f8be74ec
+•
+java:S1128"MRemove this unused import 'org.apache.kafka.clients.producer.ProducerRecord'.(ä°«¡üÿÿÿÿ8ðÈó½…2J$8e3347b5-06f2-4a7b-a939-ea4d910ed4eb
+v
+java:S1128".Remove this unused import 'java.time.Instant'.(Â‚éñÿÿÿÿÿ8ðÈó½…2J$6e0371da-8973-4fb6-a95d-05ddf2d1ba73
