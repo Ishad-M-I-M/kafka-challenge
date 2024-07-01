@@ -5,36 +5,58 @@ import org.apache.kafka.clients.producer.Producer;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.serialization.IntegerSerializer;
 import org.apache.kafka.common.serialization.StringSerializer;
-import org.example.Utils;
+import org.example.Config;
 
-import java.util.Properties;
-import java.util.Random;
+import java.util.*;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
-// Time taken to produce: 420569ms
+
+/*
+* Time taken:
+* Threads - Time(ms)
+* 1 - 5964
+* 2 - 4307
+* 4 - 3454
+* 8 - 3408
+* 16 - 3539
+* */
 public class Main {
-    public static void main(String[] args) {
-        Properties props = new Properties();
-        props.put("bootstrap.servers", "localhost:9092");
-        props.put("key.serializer", StringSerializer.class.getName());
-        props.put("value.serializer", IntegerSerializer.class.getName());
-
-        Producer<String, Integer> producer = new KafkaProducer<>(props);
-        Random random = new Random();
-
-        long numberCount = (long) Math.pow(10, 9); // 1 billion
-        long[] producedNums = new long[1000000 + 1];
-
+    public static void main(String[] args) throws InterruptedException, ExecutionException {
         long startTime = System.currentTimeMillis();
-        for (long i = 0; i < numberCount; i++) {
-            int num = random.nextInt(1, 1000000 + 1);
-            ProducerRecord<String, Integer> producerRecord = new ProducerRecord<>("count", "number", num);
-            producer.send(producerRecord);
-            producedNums[num] = producedNums[num] + 1;
+
+        ExecutorService executorService = Executors.newFixedThreadPool(Config.producerThreadCount);
+        List<Future<?>> futures = new ArrayList<>();
+
+        for (int i = 0; i < Config.producerThreadCount; i++) {
+            Runnable runnable = () -> {
+                Properties props = new Properties();
+                props.put("bootstrap.servers", "localhost:9092");
+                props.put("key.serializer", StringSerializer.class.getName());
+                props.put("value.serializer", IntegerSerializer.class.getName());
+
+                Producer<String, Integer> producer = new KafkaProducer<>(props);
+                Random random = new Random();
+
+                for (int i1 = 0; i1 < Config.messageCount/Config.producerThreadCount; i1++) {
+                    int num = random.nextInt(1, Config.range + 1);
+                    ProducerRecord<String, Integer> producerRecord = new ProducerRecord<>("count", null, num);
+                    producer.send(producerRecord);
+                }
+
+                producer.close();
+            };
+            futures.add(executorService.submit(runnable));
         }
-        producer.close();
+
+        for (Future future: futures) {
+            future.get();
+        }
+        executorService.shutdown();
+
         long endTime = System.currentTimeMillis();
         System.out.println("Time taken(ms) : " + (endTime - startTime));
-
-        Utils.writeToFile("producedNums.txt", producedNums);
     }
 }
