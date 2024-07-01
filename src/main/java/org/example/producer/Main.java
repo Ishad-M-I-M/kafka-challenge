@@ -33,8 +33,8 @@ public class Main {
         for (int i = 0; i < Config.producerThreadCount; i++) {
             Runnable runnable = () -> {
                 Properties props = new Properties();
-                props.put("bootstrap.servers", "localhost:9092");
-                props.put("key.serializer", StringSerializer.class.getName());
+                props.put("bootstrap.servers", Config.mainNode + ":9092");
+                props.put("key.serializer", IntegerSerializer.class.getName());
                 props.put("value.serializer", IntegerSerializer.class.getName());
 
                 Producer<String, Integer> producer = new KafkaProducer<>(props);
