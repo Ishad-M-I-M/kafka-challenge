@@ -38,6 +38,8 @@ public class Main {
                 counts[record.key()] += record.value();
             }
             System.out.println(records.count());
+            consumed += records.count();
+            System.out.println("Consumed: " + consumed);
             consumer.commitSync();
             if (consumed >= Config.range * Config.nodeCount) {
                 List<String> lines = new ArrayList<>();
