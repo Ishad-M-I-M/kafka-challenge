@@ -12,6 +12,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicInteger;
 
 
 /*
@@ -29,6 +30,7 @@ public class Main {
 
         ExecutorService executorService = Executors.newFixedThreadPool(Config.producerThreadCount);
         List<Future<?>> futures = new ArrayList<>();
+        AtomicInteger totalMessagesProduced = new AtomicInteger(0);
 
         for (int i = 0; i < Config.producerThreadCount; i++) {
             Runnable runnable = () -> {
@@ -36,6 +38,7 @@ public class Main {
                 props.put("bootstrap.servers", Config.myNode + ":9092");
                 props.put("key.serializer", IntegerSerializer.class.getName());
                 props.put("value.serializer", IntegerSerializer.class.getName());
+                props.put("acks", "all");
 
                 Producer<String, Integer> producer = new KafkaProducer<>(props);
                 Random random = new Random();
@@ -44,6 +47,7 @@ public class Main {
                     int num = random.nextInt(1, Config.range + 1);
                     ProducerRecord<String, Integer> producerRecord = new ProducerRecord<>("count", null, num);
                     producer.send(producerRecord);
+                    totalMessagesProduced.incrementAndGet();
                 }
 
                 producer.close();
@@ -58,5 +62,6 @@ public class Main {
 
         long endTime = System.currentTimeMillis();
         System.out.println("Time taken(ms) : " + (endTime - startTime));
+        System.out.println("Total messages produced : " + (totalMessagesProduced.get()));
     }
 }

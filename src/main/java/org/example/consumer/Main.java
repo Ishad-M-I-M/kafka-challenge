@@ -4,16 +4,19 @@ import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
+import org.apache.kafka.clients.producer.Callback;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.Producer;
 import org.apache.kafka.clients.producer.ProducerRecord;
-import org.apache.kafka.common.protocol.types.Field;
+import org.apache.kafka.clients.producer.RecordMetadata;
 import org.apache.kafka.common.serialization.IntegerDeserializer;
 import org.apache.kafka.common.serialization.IntegerSerializer;
-import org.apache.kafka.common.serialization.StringDeserializer;
 import org.example.Config;
 
+import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -23,10 +26,13 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class Main {
-    static int consumedCount = 0;
+//    static int consumedCount = 0;
+    static AtomicInteger consumedCount = new AtomicInteger(0);
     static Object lock = new Object();
+
     public static void main(String[] args) throws InterruptedException, ExecutionException, IOException {
         long startTime = System.currentTimeMillis();
 
@@ -39,10 +45,12 @@ public class Main {
             int threadId = i;
             Runnable runnable = () -> {
                 Properties props = new Properties();
-                props.put("bootstrap.servers", "localhost:9092");
-                props.put("key.deserializer", StringDeserializer.class.getName());
+                props.put("bootstrap.servers", Config.myNode + ":9092");
+                props.put("key.deserializer", IntegerDeserializer.class.getName());
                 props.put("value.deserializer", IntegerDeserializer.class.getName());
-                props.put("group.id", Integer.toString(threadId));
+                props.put("group.id", "my-group");
+                props.put("enable.auto.commit", "false");
+                props.put("auto.offset.reset", "earliest");
 
                 int[] consumedNums = new int[1000_001];
                 Consumer<String, Integer> consumer = new KafkaConsumer<>(props);
@@ -50,20 +58,20 @@ public class Main {
 
                 while (true) {
                     ConsumerRecords<String, Integer> records = consumer.poll(Duration.ofMillis(100)); // Poll for records
-                    for (ConsumerRecord<String, Integer> record : records) {
-                        consumedNums[record.value()]++;
-                    }
-                    synchronized (lock) {
-                        consumedCount += records.count();
-                    }
-                    if (consumedCount >= Config.messageCount / Config.nodeCount) {
+                    if (consumedCount.get() >= Config.messageCount) {
                         break;
                     }
+                    for (ConsumerRecord<String, Integer> record : records) {
+                        consumedNums[record.value()]++;
+                        consumedCount.incrementAndGet();
+                        System.out.println("consumed " + consumedCount.get());
+                    }
+                    consumer.commitSync();
                     System.out.println(records.count());
+
                 }
                 consumer.close();
                 counts[threadId] = consumedNums;
-
             };
             futures.add(executorService.submit(runnable));
         }
@@ -76,20 +84,34 @@ public class Main {
         long endTime = System.currentTimeMillis();
         System.out.println("Time taken(ms) : " + (endTime - startTime));
 
+        // Ensure that the producer properties are set correctly
         Properties props = new Properties();
         props.put("bootstrap.servers", Config.mainNode + ":9092");
         props.put("key.serializer", IntegerSerializer.class.getName());
         props.put("value.serializer", IntegerSerializer.class.getName());
 
         Producer<Integer, Integer> producer = new KafkaProducer<>(props);
+        List<String> lines = new ArrayList<>();
         for (int i = 1; i < 1000_001; i++) {
             int total = 0;
             for (int i1 = 0; i1 < Config.consumerThreadCount; i1++) {
-                total += i1;
+                total += counts[i1][i];
             }
             ProducerRecord<Integer, Integer> producerRecord = new ProducerRecord<>("aggregate", i, total);
-            producer.send(producerRecord);
+            int finalI = i;
+            int finalTotal = total;
+            producer.send(producerRecord, new Callback() {
+                @Override
+                public void onCompletion(RecordMetadata recordMetadata, Exception e) {
+                    if (e!= null) {
+                        System.out.println(e.getMessage());
+                    } else {
+                        lines.add(finalI + "," + finalTotal);
+                    }
+                }
+            });
         }
-
+        producer.close();
+        Files.write(Path.of("sent.csv"), lines);
     }
 }

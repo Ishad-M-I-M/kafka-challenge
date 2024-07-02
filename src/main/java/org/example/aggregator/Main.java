@@ -26,6 +26,8 @@ public class Main {
         props.put("key.deserializer", IntegerDeserializer.class.getName());
         props.put("value.deserializer", IntegerDeserializer.class.getName());
         props.put("group.id", "aggregator");
+        props.put("enable.auto.commit", "false");
+        props.put("auto.offset.reset", "latest");
 
         Consumer<Integer, Integer> consumer = new KafkaConsumer<>(props);
         consumer.subscribe(Collections.singletonList("aggregate"));
@@ -36,7 +38,7 @@ public class Main {
                 counts[record.key()] += record.value();
             }
             System.out.println(records.count());
-            consumed += records.count();
+            consumer.commitSync();
             if (consumed >= Config.range * Config.nodeCount) {
                 List<String> lines = new ArrayList<>();
                 for (int i = 1; i < Config.range + 1; i++) {
