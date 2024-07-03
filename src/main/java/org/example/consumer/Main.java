@@ -37,6 +37,7 @@ public class Main {
         long startTime = System.currentTimeMillis();
 
         ExecutorService executorService = Executors.newFixedThreadPool(Config.consumerThreadCount);
+
         List<Future<?>> futures = new ArrayList<>();
 
         int[][] counts = new int[Config.consumerThreadCount][Config.range + 1];
@@ -64,10 +65,8 @@ public class Main {
                     for (ConsumerRecord<String, Integer> record : records) {
                         consumedNums[record.value()]++;
                         consumedCount.incrementAndGet();
-                        System.out.println("consumed " + consumedCount.get());
                     }
                     consumer.commitSync();
-                    System.out.println(records.count());
 
                 }
                 consumer.close();
@@ -84,11 +83,13 @@ public class Main {
         long endTime = System.currentTimeMillis();
         System.out.println("Time taken(ms) : " + (endTime - startTime));
 
-        // Ensure that the producer properties are set correctly
+
         Properties props = new Properties();
         props.put("bootstrap.servers", Config.mainNode + ":9092");
         props.put("key.serializer", IntegerSerializer.class.getName());
         props.put("value.serializer", IntegerSerializer.class.getName());
+        props.put("batch.size",32768);
+        props.put("linger.ms",10);
 
         Producer<Integer, Integer> producer = new KafkaProducer<>(props);
         List<String> lines = new ArrayList<>();
@@ -98,18 +99,23 @@ public class Main {
                 total += counts[i1][i];
             }
             ProducerRecord<Integer, Integer> producerRecord = new ProducerRecord<>("aggregate", i, total);
-            int finalI = i;
-            int finalTotal = total;
-            producer.send(producerRecord, new Callback() {
-                @Override
-                public void onCompletion(RecordMetadata recordMetadata, Exception e) {
-                    if (e!= null) {
-                        System.out.println(e.getMessage());
-                    } else {
-                        lines.add(finalI + "," + finalTotal);
-                    }
-                }
-            });
+               int finalI = i;
+               int finalTotal = total;
+            lines.add(finalI + "," + finalTotal);
+            producer.send(producerRecord
+//                    , new Callback() {
+//                @Override
+//                public void onCompletion(RecordMetadata recordMetadata, Exception e) {
+//                    if (e!= null) {
+//                        System.out.println(e.getMessage());
+//                    } else {
+//                        lines.add(finalI + "," + finalTotal);
+//                    }
+//                }
+//            }
+            );
+
+            producer.send(producerRecord);
         }
         producer.close();
         Files.write(Path.of("sent.csv"), lines);
