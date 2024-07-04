@@ -9,6 +9,7 @@ import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.Producer;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.clients.producer.RecordMetadata;
+import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.serialization.IntegerDeserializer;
 import org.apache.kafka.common.serialization.IntegerSerializer;
 import org.example.Config;
@@ -55,7 +56,7 @@ public class Main {
 
                 int[] consumedNums = new int[1000_001];
                 Consumer<String, Integer> consumer = new KafkaConsumer<>(props);
-                consumer.subscribe(Collections.singletonList("count"));
+                consumer.assign(Collections.singleton(new TopicPartition("count", threadId)));
 
                 while (true) {
                     ConsumerRecords<String, Integer> records = consumer.poll(Duration.ofMillis(100)); // Poll for records

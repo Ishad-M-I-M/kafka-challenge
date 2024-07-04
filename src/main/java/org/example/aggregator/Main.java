@@ -4,6 +4,8 @@ import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.consumer.KafkaConsumer;
+import org.apache.kafka.common.TopicIdPartition;
+import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.serialization.IntegerDeserializer;
 import org.example.Config;
 
@@ -11,21 +13,21 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Properties;
+import java.util.*;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 public class Main {
 
     public static void main(String[] args) throws IOException, ExecutionException, InterruptedException {
         AtomicInteger consumed = new AtomicInteger(0);
         int[][] finalcounts = new int[Config.aggregateReceiveThreadCount][Config.range+1];
+        Object lock = new Object();
 
         ExecutorService executorService = Executors.newFixedThreadPool(Config.aggregateReceiveThreadCount);
         List<Future<?>> futures = new ArrayList<>();
@@ -43,8 +45,7 @@ public class Main {
                 props.put("auto.offset.reset", "latest");
 
                 Consumer<Integer, Integer> consumer = new KafkaConsumer<>(props);
-                consumer.subscribe(Collections.singletonList("aggregate"));
-
+                consumer.assign(Collections.singleton(new TopicPartition("aggregate", finalJ)));
                 while (true) {
                     ConsumerRecords<Integer, Integer> records = consumer.poll(Duration.ofMillis(100));
                     for (ConsumerRecord<Integer, Integer> record : records) {
@@ -56,6 +57,14 @@ public class Main {
                     if (consumed.get() >= Config.range * Config.nodeCount) {
                         break;
                     }
+                }
+                ArrayList<String> stringList = IntStream.range(0, counts.length)
+                        .mapToObj(i -> i + "," + counts[i])
+                        .collect(Collectors.toCollection(ArrayList::new));
+                try {
+                    Files.write(Path.of("aggregate"+ finalJ + ".csv"), stringList);
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
                 }
                 finalcounts[finalJ] = counts;
             };
