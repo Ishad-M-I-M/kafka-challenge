@@ -38,7 +38,8 @@ public class Main {
                 props.put("bootstrap.servers", Config.myNode + ":9092");
                 props.put("key.serializer", IntegerSerializer.class.getName());
                 props.put("value.serializer", IntegerSerializer.class.getName());
-                props.put("acks", "all");
+                props.put("batch.size",32768);
+                props.put("linger.ms",10);
 
                 Producer<String, Integer> producer = new KafkaProducer<>(props);
                 Random random = new Random();
